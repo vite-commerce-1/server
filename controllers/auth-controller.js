@@ -7,7 +7,7 @@ import { sendEmail } from "../utils/send-email.js";
 import jwt from "jsonwebtoken";
 
 export const registerUser = asyncHandler(async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email, password, phone } = req.body;
 
   if (!username) {
     res.status(400).json({ message: "Username is required" });
@@ -24,12 +24,18 @@ export const registerUser = asyncHandler(async (req, res) => {
     throw new Error("Password is required");
   }
 
+  if (!phone) {
+    res.status(400).json({ message: "Phone is required" });
+    throw new Error("Phone is required");
+  }
+
   const isFirstUser = (await User.countDocuments()) === 0 ? "admin" : "user";
 
   const user = await User.create({
     username,
     email,
     password,
+    phone,
     role: isFirstUser,
   });
 

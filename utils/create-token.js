@@ -17,33 +17,45 @@ export const generateRefreshToken = (id) => {
 };
 
 export const createResToken = async (user, statusCode, res) => {
-  const accessToken = signToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
+  try {
+    const accessToken = signToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
 
-  await User.findByIdAndUpdate(user._id, {
-    refreshToken: refreshToken,
-  });
+    // Menyimpan refresh token ke database
+    await User.findByIdAndUpdate(user._id, {
+      refreshToken: refreshToken,
+    }).exec();
 
-  // Set cookie options
-  const cookieOptionToken = {
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  };
+    // Set cookie options
+    const cookieOptionToken = {
+      expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+    };
 
-  const cookieOptionRefreshToken = {
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  };
+    const cookieOptionRefreshToken = {
+      expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict", 
+    };
 
-  res.cookie("jwt", accessToken, cookieOptionToken);
-  res.cookie("refreshToken", refreshToken, cookieOptionRefreshToken);
+    res.cookie("jwt", accessToken, cookieOptionToken);
+    res.cookie("refreshToken", refreshToken, cookieOptionRefreshToken);
 
-  user.password = undefined;
+    // Tidak kirim password dalam respons
+    user.password = undefined;
 
-  res.status(statusCode).json({
-    status: "success",
-    data: user,
-  });
+    res.status(statusCode).json({
+      status: "success",
+      data: user,
+    });
+  } catch (error) {
+    console.error("Error creating response token:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Internal server error",
+    });
+  }
 };

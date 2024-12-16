@@ -6,46 +6,12 @@ import { Otp } from "./otp.model.js";
 
 const { Schema } = mongoose;
 
-const addressSchema = new Schema(
-  {
-    street: {
-      type: String,
-    },
-    city: {
-      type: String,
-    },
-    state: {
-      type: String,
-    },
-    postalCode: {
-      type: String,
-    },
-    country: {
-      type: String,
-    },
-    coordinates: {
-      type: {
-        latitude: {
-          type: Number,
-        },
-        longitude: {
-          type: Number,
-        },
-      },
-    },
-    isDefault: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  { timestamps: true }
-);
-
 const userSchema = new Schema({
   username: {
     type: String,
     required: [true, "username is required"],
     unique: [true, "username is already taken"],
+    trim: true,
   },
   email: {
     type: String,
@@ -61,6 +27,9 @@ const userSchema = new Schema({
   },
   phone: {
     type: String,
+    required: [true, "phone is required"],
+    unique: true,
+    trim: true,
   },
   password: {
     type: String,
@@ -72,9 +41,6 @@ const userSchema = new Schema({
     enum: ["user", "admin"],
     default: "user",
   },
-  address: {
-    addressSchema,
-  },
   isVerified: {
     type: Boolean,
     default: false,
@@ -83,6 +49,9 @@ const userSchema = new Schema({
     type: String,
   },
   emailVerifiedAt: {
+    type: Date,
+  },
+  otpExpiration: {
     type: Date,
   },
 });
@@ -107,7 +76,15 @@ userSchema.methods.generateOtpCode = async function () {
     charset: "numeric",
   });
 
-  let now = new Date();
+  const now = new Date();
+
+  const otpExpiration = new Date(now);
+  otpExpiration.setMinutes(otpExpiration.getMinutes() + 5);
+
+  const existingOtp = await Otp.findOne({ user: this._id });
+  if (existingOtp && new Date(existingOtp.validUntil) > now) {
+    return { message: "OTP already sent" };
+  }
 
   const otp = await Otp.findOneAndUpdate(
     {

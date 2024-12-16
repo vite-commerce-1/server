@@ -3,11 +3,11 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const mailerConfig = {
-  host: process.env.MAILTRAP_HOST,
-  port: process.env.MAILTRAP_PORT,
+  host: "smtp.gmail.com",
+  port: 587,
   secure: false,
   auth: {
-    user: process.env.MAILTRAP_USERNAME,
-    pass: process.env.MAILTRAP_PASSWORD,
+    user: "muhamadkopal32@gmail.com",
+    pass: "vrnx eroy wieb fxuf",
   },
 };

@@ -1,8 +1,9 @@
 import { asyncHandler } from "../middlewares/async-handler.js";
 import User from "../models/user.model.js";
+import { v2 as cloudinary } from "cloudinary";
+import streamifier from "streamifier";
 
-const uploadImagesToCloudinary = async (files) => {
-  const file = files[0];
+const uploadImagesToCloudinary = async (file) => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
@@ -11,8 +12,12 @@ const uploadImagesToCloudinary = async (files) => {
         transformation: [{ fetch_format: "webp" }],
       },
       (error, result) => {
-        if (error) reject(error);
-        else resolve(result.secure_url);
+        if (error) {
+          console.error("Cloudinary upload error:", error); // Log the exact error from Cloudinary
+          reject(error);
+        } else {
+          resolve(result.secure_url);
+        }
       }
     );
     streamifier.createReadStream(file.buffer).pipe(stream);
@@ -22,62 +27,65 @@ const uploadImagesToCloudinary = async (files) => {
 export const getAllUser = asyncHandler(async (req, res) => {
   const users = await User.find();
 
-  if (!users) {
+  if (!users || users.length === 0) {
     res.status(401);
     throw new Error("Users not found");
   }
 
   res.status(200).json({
-    message: "All users",
+    message: "All users fetched successfully",
     data: users,
   });
 });
 
 export const updateUser = asyncHandler(async (req, res) => {
   const userId = req.user._id;
-  const { username, email, phone, address } = req.body;
+  const { username, email, phone } = req.body;
 
-  let user = await User.findById(userId);
-  if (!user) {
-    res.status(404);
-    throw new Error("User not found");
-  }
+  let imageUrl = req.user.image;
 
-  let imageUrl = user.image;
   if (req.file) {
     try {
       imageUrl = await uploadImagesToCloudinary(req.file);
     } catch (error) {
       res.status(500);
-      throw new Error("Error uploading image to Cloudinary");
+      throw new Error("Failed to upload image to Cloudinary");
     }
   }
 
-  // Update data user
-  if (username) user.username = username;
-  if (email) {
-    if (!validator.isEmail(email)) {
-      res.status(400);
-      throw new Error("Invalid email format");
-    }
-    const emailExist = await User.findOne({ email });
-    if (emailExist && emailExist._id.toString() !== userId) {
-      res.status(400);
-      throw new Error("Email is already taken");
-    }
-    user.email = email;
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    {
+      username,
+      email,
+      phone,
+      image: imageUrl,
+    },
+    { new: true, runValidators: true }
+  ).select("-password");
+
+  if (!updatedUser) {
+    res.status(404);
+    throw new Error("User not found");
   }
-  if (phone) user.phone = phone;
-  if (address) user.address = address;
-
-  user.image = imageUrl;
-
-  await user.save();
 
   res.status(200).json({
     message: "User updated successfully",
-    data: user,
+    data: updatedUser,
   });
 });
 
-export const deleteUser = asyncHandler(async (req, res) => {});
+export const deleteUser = asyncHandler(async (req, res) => {
+  const userId = req.user._id;
+
+  const deletedUser = await User.findByIdAndDelete(userId);
+
+  if (!deletedUser) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  res.status(200).json({
+    message: "User deleted successfully",
+  });
+});

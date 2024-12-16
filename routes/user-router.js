@@ -18,6 +18,6 @@ router.get("/", protectedMiddleware, adminMiddleware, getAllUser);
 
 router.put("/update", protectedMiddleware, upload.single("image"), updateUser);
 
-router.delete("/delete", protectedMiddleware, deleteUser);
+router.delete("/delete", protectedMiddleware, adminMiddleware, deleteUser);
 
 export default router;
