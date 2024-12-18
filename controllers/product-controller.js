@@ -52,38 +52,43 @@ export const createProduct = asyncHandler(async (req, res) => {
     throw new Error("Product image is required");
   }
 
-  // Pastikan `type` selalu berupa array
   let parsedTypes = [];
-  try {
-    if (typeof type === "string") {
-      const parsed = JSON.parse(type);
-      parsedTypes = Array.isArray(parsed) ? parsed : [parsed]; // Bungkus object tunggal jadi array
-    } else if (typeof type === "object" && !Array.isArray(type)) {
-      parsedTypes = [type]; // Jika object tunggal, bungkus jadi array
-    } else if (Array.isArray(type)) {
-      parsedTypes = type; // Jika sudah array, gunakan langsung
-    } else {
-      throw new Error(
-        "Invalid type format. Expected JSON string, object, or array."
-      );
+  if (type) {
+    try {
+      if (typeof type === "string") {
+        const parsed = JSON.parse(type);
+        parsedTypes = Array.isArray(parsed) ? parsed : [parsed];
+      } else if (typeof type === "object" && !Array.isArray(type)) {
+        parsedTypes = [type]; // Jika object tunggal, bungkus jadi array
+      } else if (Array.isArray(type)) {
+        parsedTypes = type; // Jika sudah array, gunakan langsung
+      } else {
+        throw new Error(
+          "Invalid type format. Expected JSON string, object, or array."
+        );
+      }
+    } catch (error) {
+      console.log("Failed to parse type:", type);
+      res.status(400).json({
+        message: `Failed to parse type. Ensure it is a valid JSON string, object, or array. Error: ${error.message}`,
+      });
+      return;
     }
-  } catch (error) {
-    console.log("Failed to parse type:", type);
-    res.status(400).json({
-      message: `Failed to parse type. Ensure it is a valid JSON string, object, or array. Error: ${error.message}`,
-    });
-    return;
-  }
 
-  // Validasi elemen-elemen dalam `parsedTypes`
-  parsedTypes.forEach((item, index) => {
-    if (!item.key || !Array.isArray(item.values) || item.values.length === 0) {
-      res.status(400);
-      throw new Error(
-        `Invalid type data at index ${index}: ${JSON.stringify(item)}`
-      );
-    }
-  });
+    // Validasi elemen-elemen dalam `parsedTypes` jika ada
+    parsedTypes.forEach((item, index) => {
+      if (
+        !item.key ||
+        !Array.isArray(item.values) ||
+        item.values.length === 0
+      ) {
+        res.status(400);
+        throw new Error(
+          `Invalid type data at index ${index}: ${JSON.stringify(item)}`
+        );
+      }
+    });
+  }
 
   try {
     const categoryDoc = await Category.findOne({ name: category });
@@ -101,7 +106,7 @@ export const createProduct = asyncHandler(async (req, res) => {
       name,
       description,
       price,
-      type: parsedTypes,
+      type: parsedTypes, // type bisa berupa array kosong atau sesuai data yang dikirim
       category: categoryId,
       image: imagesUrls,
     };
@@ -125,19 +130,72 @@ export const createProduct = asyncHandler(async (req, res) => {
 });
 
 export const getAllProduct = asyncHandler(async (req, res) => {
-  const products = await Product.find().populate({
+  const { page, limit, name, category } = req.query;
+
+  const query = {};
+
+  if (category) {
+    if (category.match(/^[0-9a-fA-F]{24}$/)) {
+      query.category = category; // Jika category adalah ID, gunakan langsung
+    } else {
+      const categoryDoc = await Category.findOne({
+        name: { $regex: category, $options: "i" }, // Pencarian kategori berdasarkan nama
+      });
+
+      if (categoryDoc) {
+        query.category = categoryDoc._id; // Menggunakan ID kategori
+      } else {
+        return res.status(404).json({
+          success: false,
+          message: `Category with name '${category}' not found.`,
+        });
+      }
+    }
+  }
+
+  if (name) {
+    query.name = { $regex: name, $options: "i" };
+  }
+
+  const pageNumber = parseInt(page, 10) || 1;
+  const limitNumber = parseInt(limit, 10) || 10;
+  const skip = (pageNumber - 1) * limitNumber;
+
+  let productsQuery = Product.find(query).skip(skip).limit(limitNumber);
+
+  const totalProduct = await Product.countDocuments(query);
+
+  if (pageNumber > Math.ceil(totalProduct / limitNumber)) {
+    return res.status(404).json({
+      success: false,
+      message: "This page does not exist.",
+    });
+  }
+
+  productsQuery = await productsQuery.populate({
     path: "category",
     select: "name",
   });
 
-  if (!products) {
-    res.status(401);
-    throw new Error("Products not found");
+  if (!productsQuery || productsQuery.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: "No products found",
+    });
   }
 
+  const totalPages = Math.ceil(totalProduct / limitNumber);
+
   res.status(200).json({
-    message: "All products",
-    data: products,
+    success: true,
+    message: "Products fetched successfully",
+    data: productsQuery,
+    pagination: {
+      totalProduct,
+      totalPages,
+      currentPage: pageNumber,
+      limit: limitNumber,
+    },
   });
 });
 
@@ -165,78 +223,105 @@ export const updateProduct = asyncHandler(async (req, res) => {
   const { name, description, price, type, category } = req.body;
 
   try {
+    // Mencari produk berdasarkan ID
     const product = await Product.findById(id);
 
     if (!product) {
-      res.status(401).json({ message: "Product not found" });
+      res.status(404).json({ message: "Product not found" });
       throw new Error("Product not found");
     }
 
-    let imageNewUrls = [];
-
-    if (req.files) {
-      imageNewUrls = await uploadImagesToCloudinary(req.files);
+    // Validasi field yang diperlukan
+    if (!name && !description && !price && !category && !type) {
+      res.status(400);
+      throw new Error(
+        "At least one field (name, description, price, type, or category) must be provided to update"
+      );
     }
 
-    // Update fields with new values if provided
+    // Validasi category (jika dikirimkan)
+    if (category) {
+      const categoryDoc = await Category.findOne({ name: category });
+      if (!categoryDoc) {
+        res.status(400);
+        throw new Error("Category not found");
+      }
+      product.category = categoryDoc._id; // Update category jika ada perubahan
+    }
+
+    // Mengelola gambar baru jika ada
+    let imageNewUrls = [];
+    if (req.files) {
+      imageNewUrls = await uploadImagesToCloudinary(req.files);
+      product.image = [...product.image, ...imageNewUrls]; // Menambahkan gambar baru
+    }
+
+    // Memperbarui field yang disediakan dalam request body
     product.name = name || product.name;
     product.description = description || product.description;
     product.price = price || product.price;
-    product.image = [...product.image, ...imageNewUrls];
 
+    // Mengelola tipe produk (type)
     if (type) {
-      // Ensure type is an array of objects, even if it's a single object
-      const typeArray = Array.isArray(type) ? type : [type];
+      // Menangani dan memvalidasi type yang dikirimkan (array, string, atau object)
+      let parsedTypes = [];
+      try {
+        if (typeof type === "string") {
+          const parsed = JSON.parse(type);
+          parsedTypes = Array.isArray(parsed) ? parsed : [parsed];
+        } else if (typeof type === "object" && !Array.isArray(type)) {
+          parsedTypes = [type]; // Jika objek tunggal, bungkus ke dalam array
+        } else if (Array.isArray(type)) {
+          parsedTypes = type; // Jika sudah array, gunakan langsung
+        } else {
+          throw new Error(
+            "Invalid type format. Expected JSON string, object, or array."
+          );
+        }
 
-      // Parse and validate each item in the 'type' array
-      const parsedTypes = typeArray.map((item) => {
-        try {
-          // Check if the item is a valid object with a key and values
-          if (typeof item === "string") {
-            item = JSON.parse(item); // Try to parse if it's a string
-          }
-
-          // Validate that the item has a key and a values array
+        // Validasi elemen dalam parsedTypes
+        parsedTypes.forEach((item, index) => {
           if (
             !item.key ||
             !Array.isArray(item.values) ||
             item.values.length === 0
           ) {
             res.status(400);
-            throw new Error(`Invalid type data for ${item.key}`);
+            throw new Error(
+              `Invalid type data at index ${index}: ${JSON.stringify(item)}`
+            );
           }
+        });
 
-          return item; // Return the validated item
-        } catch (error) {
-          console.error("Error parsing type:", item); // Log the exact item causing the issue
-          res.status(400);
-          throw new Error(`Invalid type data: ${JSON.stringify(item)}`);
-        }
-      });
-
-      // Merge the new type data with the old type data
-      const existingTypes = product.type || [];
-
-      // Combine existing and new types, avoiding duplicates based on 'key'
-      const mergedTypes = [
-        ...existingTypes.filter(
-          (oldItem) =>
-            !parsedTypes.some((newItem) => newItem.key === oldItem.key)
-        ),
-        ...parsedTypes,
-      ];
-
-      product.type = mergedTypes; // Update the product's type with the merged result
+        // Menggabungkan type baru dengan type yang lama, menghindari duplikat berdasarkan key
+        const existingTypes = product.type || [];
+        const mergedTypes = [
+          ...existingTypes.filter(
+            (oldItem) =>
+              !parsedTypes.some((newItem) => newItem.key === oldItem.key)
+          ),
+          ...parsedTypes,
+        ];
+        product.type = mergedTypes; // Update type produk
+      } catch (error) {
+        res
+          .status(400)
+          .json({ message: `Failed to parse type: ${error.message}` });
+        return;
+      }
     }
 
+    // Menyimpan perubahan produk
     const updatedProduct = await product.save();
 
+    // Mengembalikan response sukses
     res.status(200).json({
-      message: "Product updated successfully",
       success: true,
+      message: "Product updated successfully",
       data: updatedProduct,
     });
   } catch (error) {
+    // Menangani error umum
     res.status(500).json({ message: error.message });
     throw new Error(error.message);
   }
