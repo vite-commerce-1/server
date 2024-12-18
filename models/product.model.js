@@ -20,12 +20,12 @@ const productSchema = new Schema({
   type: [
     {
       key: {
-        type: String, // e.g., 'size', 'color', 'screen size'
+        type: String,
         required: true,
       },
       values: [
         {
-          type: Schema.Types.Mixed, // Can be String, Number, etc. based on the key
+          type: Schema.Types.Mixed,
           required: true,
         },
       ],

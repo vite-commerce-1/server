@@ -26,6 +26,7 @@ const uploadImagesToCloudinary = async (files) => {
 
 export const createProduct = asyncHandler(async (req, res) => {
   const { name, description, price, type, category } = req.body;
+
   if (!name) {
     res.status(400);
     throw new Error("Product name is required");
@@ -51,19 +52,36 @@ export const createProduct = asyncHandler(async (req, res) => {
     throw new Error("Product image is required");
   }
 
-  const parsedTypes = type.map((item) => {
-    try {
-      return JSON.parse(item);
-    } catch (error) {
-      res.status(400);
-      throw new Error(`Invalid type data: ${item}`);
+  // Pastikan `type` selalu berupa array
+  let parsedTypes = [];
+  try {
+    if (typeof type === "string") {
+      const parsed = JSON.parse(type);
+      parsedTypes = Array.isArray(parsed) ? parsed : [parsed]; // Bungkus object tunggal jadi array
+    } else if (typeof type === "object" && !Array.isArray(type)) {
+      parsedTypes = [type]; // Jika object tunggal, bungkus jadi array
+    } else if (Array.isArray(type)) {
+      parsedTypes = type; // Jika sudah array, gunakan langsung
+    } else {
+      throw new Error(
+        "Invalid type format. Expected JSON string, object, or array."
+      );
     }
-  });
+  } catch (error) {
+    console.log("Failed to parse type:", type);
+    res.status(400).json({
+      message: `Failed to parse type. Ensure it is a valid JSON string, object, or array. Error: ${error.message}`,
+    });
+    return;
+  }
 
-  parsedTypes.forEach((item) => {
+  // Validasi elemen-elemen dalam `parsedTypes`
+  parsedTypes.forEach((item, index) => {
     if (!item.key || !Array.isArray(item.values) || item.values.length === 0) {
       res.status(400);
-      throw new Error(`Invalid type data for ${item.key}`);
+      throw new Error(
+        `Invalid type data at index ${index}: ${JSON.stringify(item)}`
+      );
     }
   });
 
