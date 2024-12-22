@@ -10,8 +10,6 @@ import {
 } from "../controllers/auth-controller.js";
 import { protectedMiddleware } from "../middlewares/auth-middleware.js";
 
-import { upload } from "../utils/upload-file-handler.js";
-
 const router = express.Router();
 
 router.post("/register", registerUser);
