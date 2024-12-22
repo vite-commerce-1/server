@@ -37,6 +37,10 @@ const addressSchema = new Schema({
     type: String,
     required: false, // Postal code
   },
+  defaultAddress: {
+    type: Boolean,
+    default: false,
+  },
   coordinates: {
     type: [Number], // Array untuk longitude dan latitude [longitude, latitude]
     required: false, // Koordinat geografis

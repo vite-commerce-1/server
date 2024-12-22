@@ -5,8 +5,12 @@ import {
   getAddressByUserId,
   updateAddress,
   deleteAddress,
+  setDefaultAddress,
 } from "../controllers/address-controller.js";
-import { protectedMiddleware } from "../middlewares/auth-middleware.js";
+import {
+  adminMiddleware,
+  protectedMiddleware,
+} from "../middlewares/auth-middleware.js";
 
 const router = express.Router();
 
@@ -17,12 +21,14 @@ router.post("/", protectedMiddleware, createAddress);
 router.get("/userId", protectedMiddleware, getAddressByUserId);
 
 // Update address by addressId
-router.put("/:addressId", updateAddress);
+router.put("/:addressId", protectedMiddleware, updateAddress);
+
+router.put("/setDefault/:addressId", protectedMiddleware, setDefaultAddress);
 
 // Delete address by addressId
-router.delete("/:addressId", deleteAddress);
+router.delete("/:addressId", protectedMiddleware, deleteAddress);
 
 // Get all addresses (optional)
-router.get("/", getAllAddresses);
+router.get("/", protectedMiddleware, adminMiddleware, getAllAddresses);
 
 export default router;

@@ -16,6 +16,8 @@ export const createAddress = asyncHandler(async (req, res) => {
 
   const userId = req.user._id;
 
+  const isFirstAddress = (await Address.countDocuments()) === 0 ? true : false;
+
   const newAddress = await Address.create({
     userId,
     detail,
@@ -26,6 +28,7 @@ export const createAddress = asyncHandler(async (req, res) => {
     country,
     postalCode,
     coordinates,
+    defaultAddress: isFirstAddress,
   });
 
   res.status(201).json({
@@ -64,6 +67,7 @@ export const updateAddress = asyncHandler(async (req, res) => {
     city,
     province,
     country,
+    defaultAddress,
     postalCode,
     coordinates,
   } = req.body;
@@ -79,6 +83,7 @@ export const updateAddress = asyncHandler(async (req, res) => {
       country,
       postalCode,
       coordinates,
+      defaultAddress,
     },
     { new: true }
   );
@@ -94,6 +99,36 @@ export const updateAddress = asyncHandler(async (req, res) => {
     success: true,
     message: "Address updated successfully",
     data: updatedAddress,
+  });
+});
+
+export const setDefaultAddress = asyncHandler(async (req, res) => {
+  const { addressId } = req.params;
+
+  // Cari alamat berdasarkan ID
+  const address = await Address.findById(addressId);
+
+  if (!address) {
+    return res.status(404).json({
+      success: false,
+      message: "Address not found",
+    });
+  }
+
+  // Nonaktifkan defaultAddress lama
+  await Address.updateMany(
+    { userId: address.userId, defaultAddress: true },
+    { $set: { defaultAddress: false } }
+  );
+
+  // Set defaultAddress baru
+  address.defaultAddress = true;
+  await address.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Default address set successfully",
+    data: address,
   });
 });
 
