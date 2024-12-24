@@ -17,20 +17,10 @@ const productSchema = new Schema({
     type: String,
     required: [true, "Product description is required"],
   },
-  type: [
-    {
-      key: {
-        type: String,
-        required: true,
-      },
-      values: [
-        {
-          type: Schema.Types.Mixed,
-          required: true,
-        },
-      ],
-    },
-  ],
+  stock: {
+    type: Number,
+    required: [true, "Product stock is required"],
+  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Category",
