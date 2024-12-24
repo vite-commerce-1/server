@@ -42,21 +42,17 @@ const addressSchema = new Schema({
     default: false,
   },
   coordinates: {
-    type: [Number], // Array untuk longitude dan latitude [longitude, latitude]
-    required: false, // Koordinat geografis
-    validate: {
-      validator: function (value) {
-        // Validasi untuk memastikan array berisi dua angka (longitude, latitude)
-        return (
-          value &&
-          value.length === 2 &&
-          typeof value[0] === "number" &&
-          typeof value[1] === "number"
-        );
+    type: {
+      latitude: {
+        type: Number,
+        required: true, // Latitude coordinate
       },
-      message:
-        "Coordinates must be an array with two numbers [longitude, latitude].",
+      longitude: {
+        type: Number,
+        required: true, // Longitude coordinate
+      },
     },
+    required: false, // Koordinat geografis
   },
 });
 
