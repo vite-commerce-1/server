@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 import { asyncHandler } from "../middlewares/async-handler.js";
 import { Otp } from "../models/otp.model.js";
 import User from "../models/user.model.js";
@@ -209,4 +210,52 @@ export const refreshToken = asyncHandler(async (req, res) => {
       createResToken(user, 200, res);
     }
   );
+});
+
+export const updatePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword, confirmPassword } = req.body;
+
+  // Validasi input
+  if (!oldPassword) {
+    res.status(400);
+    throw new Error("Old password is required");
+  }
+  if (!newPassword) {
+    res.status(400);
+    throw new Error("New password is required");
+  }
+  if (!confirmPassword) {
+    res.status(400);
+    throw new Error("Confirm password is required");
+  }
+  if (newPassword !== confirmPassword) {
+    res.status(400);
+    throw new Error("New password and confirm password do not match");
+  }
+  if (newPassword.length < 6) {
+    res.status(400);
+    throw new Error("New password must be at least 6 characters long");
+  }
+
+  // Ambil user dari database
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  // Verifikasi old password
+  const isPasswordCorrect = await user.comparePassword(oldPassword);
+  if (!isPasswordCorrect) {
+    res.status(400);
+    throw new Error("Old password is incorrect");
+  }
+
+  // Update password
+  user.password = newPassword;
+  await user.save();
+
+  res.status(200).json({
+    message: "Password updated successfully",
+  });
 });
