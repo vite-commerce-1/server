@@ -25,7 +25,7 @@ const uploadImagesToCloudinary = async (files) => {
 };
 
 export const createProduct = asyncHandler(async (req, res) => {
-  const { name, description, price, type, category } = req.body;
+  const { name, description, price, variant, category } = req.body;
 
   if (!name) {
     res.status(400);
@@ -52,31 +52,31 @@ export const createProduct = asyncHandler(async (req, res) => {
     throw new Error("Product image is required");
   }
 
-  let parsedTypes = [];
-  if (type) {
+  let parsedVariant = [];
+  if (variant) {
     try {
-      if (typeof type === "string") {
-        const parsed = JSON.parse(type);
-        parsedTypes = Array.isArray(parsed) ? parsed : [parsed];
-      } else if (typeof type === "object" && !Array.isArray(type)) {
-        parsedTypes = [type]; // Jika object tunggal, bungkus jadi array
-      } else if (Array.isArray(type)) {
-        parsedTypes = type; // Jika sudah array, gunakan langsung
+      if (typeof variant === "string") {
+        const parsed = JSON.parse(variant);
+        parsedVariant = Array.isArray(parsed) ? parsed : [parsed];
+      } else if (typeof variant === "object" && !Array.isArray(variant)) {
+        parsedVariant = [variant]; // Jika object tunggal, bungkus jadi array
+      } else if (Array.isArray(variant)) {
+        parsedVariant = variant; // Jika sudah array, gunakan langsung
       } else {
         throw new Error(
           "Invalid type format. Expected JSON string, object, or array."
         );
       }
     } catch (error) {
-      console.log("Failed to parse type:", type);
+      console.log("Failed to parse type:", variant);
       res.status(400).json({
         message: `Failed to parse type. Ensure it is a valid JSON string, object, or array. Error: ${error.message}`,
       });
       return;
     }
 
-    // Validasi elemen-elemen dalam `parsedTypes` jika ada
-    parsedTypes.forEach((item, index) => {
+    // Validasi elemen-elemen dalam `parsedVariant` jika ada
+    parsedVariant.forEach((item, index) => {
       if (
         !item.key ||
         !Array.isArray(item.values) ||
@@ -106,7 +106,7 @@ export const createProduct = asyncHandler(async (req, res) => {
       name,
       description,
       price,
-      type: parsedTypes, // type bisa berupa array kosong atau sesuai data yang dikirim
+      variant: parsedVariant, // variant bisa berupa array kosong atau sesuai data yang dikirim
       category: categoryId,
       image: imagesUrls,
     };
@@ -264,23 +264,23 @@ export const updateProduct = asyncHandler(async (req, res) => {
     // Mengelola tipe produk (type)
     if (type) {
       // Menangani dan memvalidasi type yang dikirimkan (array, string, atau object)
-      let parsedTypes = [];
+      let parsedVariant = [];
       try {
         if (typeof type === "string") {
           const parsed = JSON.parse(type);
-          parsedTypes = Array.isArray(parsed) ? parsed : [parsed];
+          parsedVariant = Array.isArray(parsed) ? parsed : [parsed];
         } else if (typeof type === "object" && !Array.isArray(type)) {
-          parsedTypes = [type]; // Jika objek tunggal, bungkus ke dalam array
+          parsedVariant = [type]; // Jika objek tunggal, bungkus ke dalam array
         } else if (Array.isArray(type)) {
-          parsedTypes = type; // Jika sudah array, gunakan langsung
+          parsedVariant = type; // Jika sudah array, gunakan langsung
         } else {
           throw new Error(
             "Invalid type format. Expected JSON string, object, or array."
           );
         }
 
-        // Validasi elemen dalam parsedTypes
-        parsedTypes.forEach((item, index) => {
+        // Validasi elemen dalam parsedVariant
+        parsedVariant.forEach((item, index) => {
           if (
             !item.key ||
             !Array.isArray(item.values) ||
@@ -298,9 +298,9 @@ export const updateProduct = asyncHandler(async (req, res) => {
         const mergedTypes = [
           ...existingTypes.filter(
             (oldItem) =>
-              !parsedTypes.some((newItem) => newItem.key === oldItem.key)
+              !parsedVariant.some((newItem) => newItem.key === oldItem.key)
           ),
-          ...parsedTypes,
+          ...parsedVariant,
         ];
         product.type = mergedTypes; // Update type produk
       } catch (error) {
