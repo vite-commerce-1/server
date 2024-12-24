@@ -1,4 +1,4 @@
-import Cart from "../models/cart.model.js"
+import Cart from "../models/cart.model.js";
 import Product from "../models/product.model.js";
 import { asyncHandler } from "../middlewares/async-handler.js";
 
@@ -6,41 +6,53 @@ import { asyncHandler } from "../middlewares/async-handler.js";
 export const createOrUpdateCart = asyncHandler(async (req, res) => {
   const { productId, quantity } = req.body;
 
-  // Validasi jika quantity dan productId ada
-  if (!productId || !quantity) {
+  // Validasi apakah productId dan quantity disediakan
+  if (!productId || typeof quantity !== "number") {
     res.status(400);
-    throw new Error("Product ID and quantity are required");
+    throw new Error("Product ID dan quantity diperlukan");
   }
 
-  // Cari produk berdasarkan ID
+  // Temukan produk berdasarkan ID
   const product = await Product.findById(productId);
   if (!product) {
     res.status(404);
-    throw new Error("Product not found");
+    throw new Error("Produk tidak ditemukan");
   }
 
-  // Temukan atau buat cart untuk user
+  // Temukan atau buat cart untuk pengguna
   let cart = await Cart.findOne({ user: req.user._id });
 
   if (cart) {
-    // Cek apakah produk sudah ada di dalam cart
+    // Cek apakah produk sudah ada dalam cart
     const itemIndex = cart.items.findIndex(
       (item) => item.product.toString() === productId
     );
 
     if (itemIndex > -1) {
       // Jika produk ada, update quantity
-      cart.items[itemIndex].quantity += quantity;
-      cart.items[itemIndex].totalPrice =
-        cart.items[itemIndex].quantity * product.price;
+      const newQuantity = quantity; // Set quantity sesuai nilai yang diberikan
+
+      if (newQuantity <= 0) {
+        // Jika quantity 0 atau kurang, hapus produk dari cart
+        cart.items.splice(itemIndex, 1);
+      } else {
+        // Jika quantity lebih dari 0, update quantity dan totalPrice
+        cart.items[itemIndex].quantity = newQuantity;
+        cart.items[itemIndex].totalPrice = newQuantity * product.price;
+      }
     } else {
-      // Jika produk belum ada di cart, tambahkan produk baru
-      cart.items.push({
-        product: productId,
-        quantity,
-        price: product.price,
-        totalPrice: quantity * product.price,
-      });
+      // Jika produk belum ada dalam cart, tambahkan ke cart
+      if (quantity > 0) {
+        cart.items.push({
+          product: productId,
+          quantity,
+          price: product.price,
+          totalPrice: quantity * product.price,
+        });
+      } else {
+        res.status(400);
+        throw new Error("Quantity harus lebih besar dari 0");
+      }
     }
 
     // Update totalAmount
@@ -48,23 +60,31 @@ export const createOrUpdateCart = asyncHandler(async (req, res) => {
       (sum, item) => sum + item.totalPrice,
       0
     );
+
+    // Simpan cart yang diperbarui
     await cart.save();
   } else {
     // Jika cart belum ada, buat cart baru
-    cart = await Cart.create({
-      user: req.user._id,
-      items: [
-        {
-          product: productId,
-          quantity,
-          price: product.price,
-          totalPrice: quantity * product.price,
-        },
-      ],
-      totalAmount: quantity * product.price,
-    });
+    if (quantity > 0) {
+      cart = await Cart.create({
+        user: req.user._id,
+        items: [
+          {
+            product: productId,
+            quantity,
+            price: product.price,
+            totalPrice: quantity * product.price,
+          },
+        ],
+        totalAmount: quantity * product.price,
+      });
+    } else {
+      res.status(400);
+      throw new Error("Quantity harus lebih besar dari 0");
+    }
   }
 
+  // Kembalikan cart yang diperbarui
   res.status(200).json(cart);
 });
 
@@ -80,7 +100,9 @@ export const getCart = asyncHandler(async (req, res) => {
     throw new Error("Cart not found");
   }
 
-  res.status(200).json(cart);
+  res.status(200).json({
+    data: cart,
+  });
 });
 
 // Update Cart Item Quantity
