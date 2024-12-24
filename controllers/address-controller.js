@@ -132,18 +132,30 @@ export const setDefaultAddress = asyncHandler(async (req, res) => {
   });
 });
 
-// Delete address by id
 export const deleteAddress = asyncHandler(async (req, res) => {
   const { addressId } = req.params;
 
-  const address = await Address.findByIdAndDelete(addressId);
+  // Cari alamat berdasarkan ID
+  const address = await Address.findById(addressId);
 
+  // Jika alamat tidak ditemukan
   if (!address) {
     return res.status(404).json({
       success: false,
       message: "Address not found",
     });
   }
+
+  // Cek apakah address adalah defaultAddress
+  if (address.defaultAddress) {
+    return res.status(400).json({
+      success: false,
+      message: "Cannot delete the default address.",
+    });
+  }
+
+  // Hapus alamat
+  await Address.findByIdAndDelete(addressId);
 
   res.status(200).json({
     success: true,
