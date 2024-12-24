@@ -6,6 +6,7 @@ import {
   logoutUser,
   refreshToken,
   registerUser,
+  updatePassword,
   verificationUser,
 } from "../controllers/auth-controller.js";
 import { protectedMiddleware } from "../middlewares/auth-middleware.js";
@@ -25,5 +26,7 @@ router.post("/generate-otp-code", protectedMiddleware, generateOtpCode);
 router.post("/verification-account", protectedMiddleware, verificationUser);
 
 router.post("/refresh-token", protectedMiddleware, refreshToken);
+
+router.put("/update-password", protectedMiddleware, updatePassword);
 
 export default router;
