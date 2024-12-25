@@ -16,7 +16,8 @@ export const createAddress = asyncHandler(async (req, res) => {
 
   const userId = req.user._id;
 
-  const isFirstAddress = (await Address.countDocuments()) === 0 ? true : false;
+  const addressCount = await Address.countDocuments({ userId });
+  const isFirstAddress = addressCount === 0;
 
   const newAddress = await Address.create({
     userId,
