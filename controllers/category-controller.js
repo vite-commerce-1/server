@@ -28,6 +28,11 @@ export const createCategory = asyncHandler(async (req, res) => {
     throw new Error("Category name is required");
   }
 
+  if (!req.file) {
+    res.status(400);
+    throw new Error("Category image is required");
+  }
+
   let imageUrl;
 
   if (req.file) {

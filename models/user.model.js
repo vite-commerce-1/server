@@ -28,7 +28,7 @@ const userSchema = new Schema({
   phone: {
     type: String,
     required: [true, "phone is required"],
-    unique: true,
+    unique: [true, "Phone is already exists"],
     trim: true,
   },
   password: {

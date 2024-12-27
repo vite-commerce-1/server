@@ -85,7 +85,7 @@ export const createOrUpdateCart = asyncHandler(async (req, res) => {
   }
 
   // Kembalikan cart yang diperbarui
-  res.status(200).json(cart);
+  res.status(200).json({ data: cart });
 });
 
 // Get Cart
@@ -145,7 +145,7 @@ export const updateCartItem = asyncHandler(async (req, res) => {
 
   await cart.save();
 
-  res.status(200).json(cart);
+  res.status(200).json({ data: cart });
 });
 
 // Remove Item from Cart
